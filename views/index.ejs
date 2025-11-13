@@ -1,0 +1,248 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Customers</title>
+
+  <!-- designhehe -->
+  <link
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+    rel="stylesheet"
+  />
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+</head>
+<body class="bg-light">
+
+  <div class="container py-4">
+    <h1 class="mb-4">Customer List</h1>
+
+    <!-- Search + Sort + New Customer -->
+    <div class="d-flex justify-content-between align-items-center mb-3 gap-3 flex-wrap">
+
+      <form class="d-flex align-items-center gap-2" action="/" method="get">
+        <input
+          class="form-control"
+          type="text"
+          name="q"
+          placeholder="Search name, company, email"
+          value="<%= q || '' %>"
+          style="min-width:260px;"
+        />
+        <input type="hidden" name="pageSize" value="<%= pageSize %>">
+
+        <select name="sort" class="form-select" style="width:220px;">
+          <option value="id_desc" <%= sort === 'id_desc' ? 'selected' : '' %>>Newest first</option>
+          <option value="id_asc" <%= sort === 'id_asc' ? 'selected' : '' %>>Oldest first</option>
+          <option value="name_asc" <%= sort === 'name_asc' ? 'selected' : '' %>>Name A → Z</option>
+          <option value="name_desc" <%= sort === 'name_desc' ? 'selected' : '' %>>Name Z → A</option>
+          <option value="company_asc" <%= sort === 'company_asc' ? 'selected' : '' %>>Company A → Z</option>
+          <option value="company_desc" <%= sort === 'company_desc' ? 'selected' : '' %>>Company Z → A</option>
+          <option value="created_desc" <%= sort === 'created_desc' ? 'selected' : '' %>>Created newest</option>
+          <option value="created_asc" <%= sort === 'created_asc' ? 'selected' : '' %>>Created oldest</option>
+        </select>
+
+        <button class="btn btn-primary" type="submit">Apply</button>
+
+        <% if (q) { %>
+          <a href="/?sort=<%= sort %>&pageSize=<%= pageSize %>" class="btn btn-secondary ms-2">Clear</a>
+        <% } %>
+      </form>
+
+      <div>
+        <a href="/new" class="btn btn-success">➕ New Customer</a>
+      </div>
+
+    </div>
+
+    <hr>
+
+
+
+    <!-- MULTI DELETE TOGGLE -->
+    <div class="mb-3 d-flex align-items-center gap-3">
+      <button id="toggleMultiDelete" class="btn btn-secondary btn-sm">
+        Enable Multi-Delete
+      </button>
+
+      <!-- SELECT ALL -->
+      <div id="selectAllWrapper" style="display:none;">
+        <input id="selectAll" type="checkbox">
+        <label for="selectAll" class="ms-1">Select all</label>
+      </div>
+
+      <!-- DELETE SELECTED -->
+      <button id="deleteSelectedBtn"
+              form="bulkDeleteForm"
+              type="submit"
+              class="btn btn-danger btn-sm"
+              style="display:none;"
+              disabled>
+        Delete selected
+      </button>
+    </div>
+
+
+
+    <!-- BULK DELETE FORM -->
+    <form id="bulkDeleteForm" action="/delete-multiple" method="post">
+      <ul class="list-group mb-3">
+
+        <% if (customers.length === 0) { %>
+          <li class="list-group-item text-center">No customers found.</li>
+        <% } else { %>
+          <% customers.forEach(c => { %>
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+
+              <div class="d-flex align-items-start gap-3">
+
+               <!--checkbox-->
+                <div class="form-check multi-checkbox" style="display:none;">
+                  <input class="form-check-input row-checkbox"
+                        type="checkbox"
+                        name="ids"
+                        value="<%= c.id %>">
+                </div>
+
+                <div>
+                  <strong><%= c.name %></strong>
+                  <div class="text-muted small">
+                    <% if (c.company) { %> <%= c.company %> <% } %>
+                    <% if (c.email) { %> • <%= c.email %> <% } %>
+                  </div>
+
+                  <div class="text-muted small">
+                    <% let added = c.created_at ? new Date(c.created_at) : null; %>
+                    Date Added:
+                    <%= added ? added.toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' }) : '—' %>
+                  </div>
+                </div>
+
+              </div>
+
+              <div>
+                <a href="/edit/<%= c.id %>" class="btn btn-sm btn-warning">Edit</a>
+
+                <form action="/delete/<%= c.id %>" method="post" style="display:inline-block">
+                  <button class="btn btn-sm btn-danger"
+                          onclick="return confirm('Delete this customer?')">
+                    Delete
+                  </button>
+                </form>
+              </div>
+
+            </li>
+          <% }) %>
+        <% } %>
+
+      </ul>
+    </form>
+
+
+
+    
+    <script>
+      const toggleBtn = document.getElementById('toggleMultiDelete');
+      const selectAllWrapper = document.getElementById('selectAllWrapper');
+      const selectAll = document.getElementById('selectAll');
+      const deleteSelectedBtn = document.getElementById('deleteSelectedBtn');
+      const checkboxes = () => Array.from(document.querySelectorAll('.row-checkbox'));
+      const checkboxContainers = document.querySelectorAll('.multi-checkbox');
+
+      let multiMode = false;
+
+      // Toggle multi-delete mode
+      toggleBtn.addEventListener('click', () => {
+        multiMode = !multiMode;
+
+        toggleBtn.textContent = multiMode ? "Disable Multi-Delete" : "Enable Multi-Delete";
+
+        // Show/hide UI
+        selectAllWrapper.style.display = multiMode ? "block" : "none";
+        deleteSelectedBtn.style.display = multiMode ? "inline-block" : "none";
+        checkboxContainers.forEach(box => {
+          box.style.display = multiMode ? "block" : "none";
+        });
+
+        if (!multiMode) {
+          // Reset everything
+          checkboxes().forEach(cb => cb.checked = false);
+          selectAll.checked = false;
+          deleteSelectedBtn.disabled = true;
+        }
+      });
+
+      // Select all
+      selectAll.addEventListener('change', (e) => {
+        const checked = e.target.checked;
+        checkboxes().forEach(cb => cb.checked = checked);
+        deleteSelectedBtn.disabled = !checked;
+      });
+
+      // Individual checkbox logic
+      document.addEventListener('change', (e) => {
+        if (e.target.classList.contains('row-checkbox')) {
+          const anyChecked = checkboxes().some(cb => cb.checked);
+          deleteSelectedBtn.disabled = !anyChecked;
+
+          const allChecked = checkboxes().every(cb => cb.checked);
+          selectAll.checked = allChecked;
+        }
+      });
+
+      // Confirm delete
+      document.getElementById('bulkDeleteForm').onsubmit = function () {
+        const checked = checkboxes().filter(cb => cb.checked);
+        if (!checked.length) return false;
+        return confirm(`Delete ${checked.length} customer(s)?`);
+      };
+    </script>
+
+
+    <!-- Summary -->
+    <p class="text-muted">
+      Showing <%= (page - 1) * pageSize + (customers.length ? 1 : 0) %>–
+      <%= (page - 1) * pageSize + customers.length %> of
+      <%= total %> customers.
+    </p>
+
+    <!-- Pagination -->
+    <% if (totalPages > 1) { %>
+      <nav>
+        <ul class="pagination">
+          <% 
+            function link(p) {
+              const params = new URLSearchParams();
+              if (q) params.set('q', q);
+              if (sort) params.set('sort', sort);
+              params.set('pageSize', pageSize);
+              params.set('page', p);
+              return '/?' + params.toString();
+            }
+          %>
+
+          <% if (page > 1) { %>
+            <li class="page-item">
+              <a class="page-link" href="<%= link(page - 1) %>">« Prev</a>
+            </li>
+          <% } %>
+
+          <% for (let i = 1; i <= totalPages; i++) { %>
+            <li class="page-item <%= i===page ? 'active' : '' %>">
+              <a class="page-link" href="<%= link(i) %>"><%= i %></a>
+            </li>
+          <% } %>
+
+          <% if (page < totalPages) { %>
+            <li class="page-item">
+              <a class="page-link" href="<%= link(page + 1) %>">Next »</a>
+            </li>
+          <% } %>
+        </ul>
+      </nav>
+    <% } %>
+
+  </div>
+
+</body>
+</html>
